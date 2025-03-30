@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Krixus AI</title>
+    <style>
+        body {
+            background-color: lightgray;
+            text-align: center;
+        }
+        .box {
+            background-color: white;
+            padding: 20px;
+            margin: 100px auto;
+            width: 300px;
+            border: 1px solid gray;
+        }
+        input {
+            width: 80%;
+            padding: 10px;
+            margin: 10px;
+        }
+        button {
+            padding: 10px;
+            background-color: blue;
+            color: white;
+            border: none;
+        }
+        #output {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>Krixus AI</h1>
+        <input type="text" id="command" placeholder="Krixus se poochho...">
+        <button onclick="askKrixus()">Poochho</button>
+        <div id="output">Hi, main Krixus hoon! Kya poochhna hai?</div>
+    </div>
+
+    <script>
+        function askKrixus() {
+            var command = document.getElementById('command').value;
+            fetch('/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'command=' + encodeURIComponent(command)
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('output').innerText = data.response;
+            });
+            document.getElementById('command').value = '';
+        }
+        document.getElementById('command').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') { askKrixus(); }
+        });
+    </script>
+</body>
+</html>
