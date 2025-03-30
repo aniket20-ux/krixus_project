@@ -16,6 +16,7 @@
         button:hover { background: #00ff00; color: #1a1a1a; }
         #output { margin-top: 20px; }
         img { max-width: 100%; border-radius: 10px; }
+        .loading { display: none; margin-top: 10px; color: #1a1a1a; }
     </style>
 </head>
 <body>
@@ -32,6 +33,7 @@
                 <input type="file" name="file" accept="image/*" required>
                 <button type="button" onclick="convertImage()">Convert</button>
             </form>
+            <div class="loading" id="loading">Processing... Please wait!</div>
             <div id="output"></div>
         </div>
     </div>
@@ -39,6 +41,10 @@
         function convertImage() {
             const form = document.getElementById('upload-form');
             const formData = new FormData(form);
+            const loading = document.getElementById('loading');
+            const output = document.getElementById('output');
+            loading.style.display = 'block';
+            output.innerHTML = '';
             fetch('/ghibli', {
                 method: 'POST',
                 body: formData
@@ -46,10 +52,12 @@
             .then(response => response.blob())
             .then(blob => {
                 const url = URL.createObjectURL(blob);
-                document.getElementById('output').innerHTML = `<img src="${url}" alt="Ghibli Image">`;
+                output.innerHTML = `<img src="${url}" alt="Ghibli Image">`;
+                loading.style.display = 'none';
             })
             .catch(error => {
-                document.getElementById('output').innerHTML = 'Error converting image!';
+                output.innerHTML = 'Error converting image!';
+                loading.style.display = 'none';
                 console.error('Error:', error);
             });
         }

@@ -19,6 +19,7 @@
         input[type="text"] { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
         button { padding: 10px 20px; background: #1a1a1a; color: white; border: none; border-radius: 20px; cursor: pointer; }
         button:hover { background: #00ff00; color: #1a1a1a; }
+        .captcha-container { display: {% if show_captcha %}block{% else %}none{% endif %}; }
     </style>
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
@@ -36,15 +37,18 @@
         </div>
         <div class="chat-footer">
             <input type="text" id="command" placeholder="Krixus, May I help you?" required>
-            <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
-            <button onclick="sendMessage()">Poochho</button>
+            <div class="captcha-container">
+                <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+            </div>
+            <button onclick="sendMessage()">Start</button>
         </div>
     </div>
     <script>
         function sendMessage() {
             const command = document.getElementById('command').value;
             const recaptchaResponse = grecaptcha.getResponse();
-            if (!command || !recaptchaResponse) {
+            const showCaptcha = {{ 'true' if show_captcha else 'false' }};
+            if (showCaptcha && (!recaptchaResponse || !command)) {
                 alert('Please complete the CAPTCHA and enter a command!');
                 return;
             }
@@ -59,7 +63,7 @@
             .then(data => {
                 chatBody.innerHTML += `<div class="message bot-message">${data.response}</div>`;
                 chatBody.scrollTop = chatBody.scrollHeight;
-                grecaptcha.reset();
+                if (showCaptcha) grecaptcha.reset();
             })
             .catch(error => console.error('Error:', error));
             document.getElementById('command').value = '';

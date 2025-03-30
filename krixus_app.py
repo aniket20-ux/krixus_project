@@ -3,7 +3,7 @@ from flask_httpauth import HTTPBasicAuth
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import random
 import os
@@ -11,7 +11,7 @@ import logging
 import requests
 from PIL import Image
 import io
-from datetime import timedelta
+import sympy as sp
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
@@ -23,6 +23,11 @@ logger = logging.getLogger(__name__)
 
 dummy_news_hindi = ["NDTV: DTC ko 14 hazar crore ka ghata hua.", "Times of India: Delhi mein bus kam hone se dikkat.", "ANI: CM ne report pesh ki."]
 dummy_news_english = ["NDTV: DTC lost 14,000 crore.", "Times of India: Less buses in Delhi caused loss.", "ANI: CM shared a report."]
+
+science_knowledge = {
+    "what is gravity": "Gravity is the force that attracts objects towards each other, causing them to come together or move closer. It’s why things fall to the ground and why planets orbit the Sun. Sir Isaac Newton was the first to formulate the laws of gravity in the late 17th century, and later Albert Einstein expanded on it with his theory of General Relativity, describing gravity as the bending of space-time.",
+    "what is photosynthesis": "Photosynthesis is the process by which green plants, algae, and some bacteria convert light energy into chemical energy stored in glucose. The equation is: 6CO2 + 6H2O + light energy → C6H12O6 + 6O2. It happens in the chloroplasts, where chlorophyll absorbs sunlight, takes in carbon dioxide from the air, and water from the soil, producing glucose and oxygen as byproducts."
+}
 
 users = {
     os.environ.get("USER1_NAME", "aniket"): os.environ.get("USER1_PASS", "krixus123"),
@@ -37,6 +42,7 @@ def verify_password(username, password):
     if username in users and users[username] == password:
         session['username'] = username
         session['login_time'] = time.time()
+        session['captcha_verified'] = False  # CAPTCHA verification flag
         logger.info(f"{username} sahi se andar aaya")
         return username
     logger.warning("galat password dala")
@@ -81,17 +87,49 @@ def get_time(lang):
         period = "morning" if 5 <= hour_24 < 12 else "afternoon" if 12 <= hour_24 < 17 else "evening" if 17 <= hour_24 < 20 else "night"
         return f"It’s {period} {hour_12}:{minutes}:{seconds} {am_pm} now."
 
+def solve_math(expression):
+    try:
+        # Replace % with modulo operator for SymPy
+        expression = expression.replace("%", " % ")
+        # Parse the expression using SymPy
+        expr = sp.sympify(expression)
+        result = expr.evalf()
+        # Step-by-step breakdown
+        steps = f"Let's solve {expression} step by step:\n"
+        steps += f"Step 1: Evaluate the expression following BODMAS (Brackets, Orders, Division/Multiplication, Addition/Subtraction).\n"
+        steps += f"Step 2: {expression} = {result}\n"
+        # Simple ASCII diagram for visualization (e.g., for addition)
+        if "+" in expression or "-" in expression:
+            steps += "Diagram:\n"
+            steps += "[ " + " + ".join([f"{x:>2}" for x in expression.split("+")]) + " ] = " + str(result) + "\n"
+        return steps + f"Final Answer: {result}"
+    except Exception as e:
+        return f"Sorry, I couldn’t solve this math problem: {str(e)}"
+
 def intelligent_response(command):
     command = command.lower().strip()
+    # Math questions
+    if any(op in command for op in ["+", "-", "*", "/", "%"]):
+        math_expression = re.search(r'[\d+\-*/%]+', command)
+        if math_expression:
+            return solve_math(math_expression.group())
+    # Science questions
+    for question, answer in science_knowledge.items():
+        if question in command:
+            return answer
+    # General knowledge or random questions
     if "who is" in command or "kaun hai" in command:
         name = command.replace("who is", "").replace("kaun hai", "").strip()
-        return f"{name} ke baare mein zyada jaan-ne ke liye Google pe search kar!" if is_hindi_word(command) else f"Search '{name}' on Google for more info!"
+        return f"{name} ke baare mein: Yeh ek famous personality hai. Zyada jaan-ne ke liye Wikipedia pe padh sakte ho!" if is_hindi_word(command) else f"About {name}: This is a famous personality. You can read more on Wikipedia!"
     elif "what is" in command or "kya hai" in command:
         thing = command.replace("what is", "").replace("kya hai", "").strip()
-        return f"{thing} ke baare mein zyada jaan-ne ke liye Google pe search kar!" if is_hindi_word(command) else f"Search '{thing}' on Google for more info!"
+        return f"{thing} ek interesting cheez hai. Iske baare mein Wikipedia pe padh sakte ho!" if is_hindi_word(command) else f"{thing} is an interesting thing. You can read more about it on Wikipedia!"
     elif "how to" in command or "kaise" in command:
         task = command.replace("how to", "").replace("kaise", "").strip()
-        return f"{task} karne ke liye YouTube pe tutorial dekh!" if is_hindi_word(command) else f"Watch a tutorial on YouTube to learn how to {task}!"
+        steps = f"Here’s how to {task} step by step:\n"
+        steps += "Step 1: Gather all necessary materials.\n"
+        steps += "Step 2: Follow a detailed guide on a tutorial website like wikiHow!\n"
+        return steps
     else:
         return "Mujhe samajh nahi aaya, thodi aur detail do!" if is_hindi_word(command) else "I didn’t understand, please give more details!"
 
@@ -101,7 +139,8 @@ def intelligent_response(command):
 def index():
     if not check_session_timeout():
         return Response("Session expired, please log in again!", 401, {'WWW-Authenticate': 'Basic realm="Login Required"'})
-    return render_template('index.html', recaptcha_site_key=os.environ.get("RECAPTCHA_SITE_KEY", "default-key"))
+    show_captcha = not session.get('captcha_verified', False)
+    return render_template('index.html', recaptcha_site_key=os.environ.get("RECAPTCHA_SITE_KEY", "default-key"), show_captcha=show_captcha)
 
 @app.route('/ask', methods=['POST'])
 @auth.login_required
@@ -109,9 +148,12 @@ def index():
 def ask():
     if not check_session_timeout():
         return jsonify({'response': 'Session expired, please log in again!'})
-    recaptcha_response = request.form.get('g-recaptcha-response')
-    if not recaptcha_response or not verify_recaptcha(recaptcha_response):
-        return jsonify({'response': 'Please complete the CAPTCHA!'})
+    # CAPTCHA verification only if not already verified
+    if not session.get('captcha_verified', False):
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        if not recaptcha_response or not verify_recaptcha(recaptcha_response):
+            return jsonify({'response': 'Please complete the CAPTCHA!'})
+        session['captcha_verified'] = True
     command = sanitize_input(request.form['command'].lower().strip())
     logger.info(f"{auth.current_user()} ne poochha: {command}")
     if "krixus" not in command:
@@ -126,7 +168,7 @@ def ask():
         elif command == "bye":
             response = "Bye bye, milte hain!"
         elif "weather" in command or "mausam" in command:
-            response = "Mausam jaan-ne ke liye Google pe 'weather' search kar!" if lang == "hindi" else "Check the weather on Google!"
+            response = "Aaj ka mausam: Thoda garmi hai, 30°C ke aaspaas. Detailed mausam ke liye apne city ka naam Google pe search karo!" if lang == "hindi" else "Today’s weather: It’s a bit warm, around 30°C. For detailed weather, search your city on Google!"
         elif "joke" in command or "chutkula" in command:
             response = "Ek din maine socha ki main bahut funny hoon, phir mirror dekha aur hasi ruk gayi!" if lang == "hindi" else "I thought I was funny, then I looked in the mirror and stopped laughing!"
         elif "hello" in command or "namaste" in command:

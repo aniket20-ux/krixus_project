@@ -4,3 +4,4 @@ flask-httpauth==4.8.0
 flask-limiter==3.5.0
 requests==2.31.0
 pillow==10.3.0
+sympy==1.13.3
