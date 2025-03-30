@@ -2,65 +2,70 @@
 <html>
 <head>
     <title>Krixus AI</title>
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <style>
-        body {
-            background-color: lightgray;
-            text-align: center;
-        }
-        .box {
-            background-color: white;
-            padding: 20px;
-            margin: 100px auto;
-            width: 300px;
-            border: 1px solid gray;
-        }
-        input {
-            width: 80%;
-            padding: 10px;
-            margin: 10px;
-        }
-        button {
-            padding: 10px;
-            background-color: blue;
-            color: white;
-            border: none;
-        }
-        #output {
-            margin-top: 20px;
-        }
-        .g-recaptcha {
-            margin: 10px auto;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { display: flex; height: 100vh; background: #f0f2f5; }
+        .sidebar { width: 250px; background: #1a1a1a; color: white; padding: 20px; }
+        .sidebar h2 { margin-bottom: 20px; font-size: 24px; }
+        .sidebar a { display: block; color: white; text-decoration: none; margin: 10px 0; }
+        .sidebar a:hover { color: #00ff00; }
+        .chat-container { flex: 1; display: flex; flex-direction: column; }
+        .chat-header { background: #1a1a1a; color: white; padding: 15px; text-align: center; font-size: 20px; }
+        .chat-body { flex: 1; padding: 20px; overflow-y: auto; background: url('https://www.transparenttextures.com/patterns/asfalt-light.png'); }
+        .message { margin: 10px 0; padding: 10px; border-radius: 10px; max-width: 70%; }
+        .user-message { background: #00ff00; align-self: flex-end; margin-left: auto; }
+        .bot-message { background: #ffffff; border: 1px solid #ddd; }
+        .chat-footer { padding: 15px; background: #fff; border-top: 1px solid #ddd; display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
+        button { padding: 10px 20px; background: #1a1a1a; color: white; border: none; border-radius: 20px; cursor: pointer; }
+        button:hover { background: #00ff00; color: #1a1a1a; }
     </style>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body>
-    <div class="box">
-        <h1>Krixus AI</h1>
-        <input type="text" id="command" placeholder="Krixus se poochho...">
-        <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
-        <button onclick="askKrixus()">Poochho</button>
-        <div id="output">Hi, main Krixus hoon! Kya poochhna hai?</div>
+    <div class="sidebar">
+        <h2>Krixus AI</h2>
+        <a href="/">Home</a>
+        <a href="/ghibli">Ghibli Converter</a>
+        <a href="/admin">Admin</a>
     </div>
-
+    <div class="chat-container">
+        <div class="chat-header">Krixus AI</div>
+        <div class="chat-body" id="chat-body">
+            <div class="message bot-message">Hi, main Krixus hoon! Kya poochhna hai?</div>
+        </div>
+        <div class="chat-footer">
+            <input type="text" id="command" placeholder="Krixus, May I help you?" required>
+            <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+            <button onclick="sendMessage()">Poochho</button>
+        </div>
+    </div>
     <script>
-        function askKrixus() {
-            var command = document.getElementById('command').value;
-            var recaptcha = grecaptcha.getResponse();
+        function sendMessage() {
+            const command = document.getElementById('command').value;
+            const recaptchaResponse = grecaptcha.getResponse();
+            if (!command || !recaptchaResponse) {
+                alert('Please complete the CAPTCHA and enter a command!');
+                return;
+            }
+            const chatBody = document.getElementById('chat-body');
+            chatBody.innerHTML += `<div class="message user-message">${command}</div>`;
             fetch('/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'command=' + encodeURIComponent(command) + '&g-recaptcha-response=' + recaptcha
+                body: `command=${encodeURIComponent(command)}&g-recaptcha-response=${recaptchaResponse}`
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById('output').innerText = data.response;
-                grecaptcha.reset();  // CAPTCHA reset karo
-            });
+                chatBody.innerHTML += `<div class="message bot-message">${data.response}</div>`;
+                chatBody.scrollTop = chatBody.scrollHeight;
+                grecaptcha.reset();
+            })
+            .catch(error => console.error('Error:', error));
             document.getElementById('command').value = '';
         }
         document.getElementById('command').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') { askKrixus(); }
+            if (e.key === 'Enter') sendMessage();
         });
     </script>
 </body>

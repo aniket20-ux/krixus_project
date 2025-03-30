@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ghibli Converter</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { display: flex; height: 100vh; background: #f0f2f5; }
+        .sidebar { width: 250px; background: #1a1a1a; color: white; padding: 20px; }
+        .sidebar h2 { margin-bottom: 20px; font-size: 24px; }
+        .sidebar a { display: block; color: white; text-decoration: none; margin: 10px 0; }
+        .sidebar a:hover { color: #00ff00; }
+        .main { flex: 1; padding: 20px; text-align: center; background: url('https://www.transparenttextures.com/patterns/asfalt-light.png'); }
+        .box { background: white; padding: 20px; margin: 50px auto; width: 400px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        input { margin: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 20px; background: #1a1a1a; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #00ff00; color: #1a1a1a; }
+        #output { margin-top: 20px; }
+        img { max-width: 100%; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Krixus AI</h2>
+        <a href="/">Home</a>
+        <a href="/ghibli">Ghibli Converter</a>
+        <a href="/admin">Admin</a>
+    </div>
+    <div class="main">
+        <div class="box">
+            <h1>Ghibli Converter</h1>
+            <form id="upload-form" enctype="multipart/form-data">
+                <input type="file" name="file" accept="image/*" required>
+                <button type="button" onclick="convertImage()">Convert</button>
+            </form>
+            <div id="output"></div>
+        </div>
+    </div>
+    <script>
+        function convertImage() {
+            const form = document.getElementById('upload-form');
+            const formData = new FormData(form);
+            fetch('/ghibli', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                document.getElementById('output').innerHTML = `<img src="${url}" alt="Ghibli Image">`;
+            })
+            .catch(error => {
+                document.getElementById('output').innerHTML = 'Error converting image!';
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+</html>
